@@ -1,38 +1,73 @@
-# sv
+# EchoSky
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+ATプロトコルを基盤とした分散型掲示板システム
 
-## Creating a project
+## 開発環境のセットアップ
 
-If you're seeing this, you've probably already done this step. Congrats!
+### 依存関係のインストール
 
 ```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+npm install
 ```
 
-## Developing
+### 環境変数の設定
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+ローカル開発時は `.env.local` ファイルを作成して以下を設定：
+
+```sh
+# ローカル開発環境の設定
+VITE_ENV=local
+```
+
+### 開発サーバーの起動
 
 ```sh
 npm run dev
 
-# or start the server and open the app in a new browser tab
+# ブラウザで自動的に開く場合
 npm run dev -- --open
 ```
 
-## Building
+## OAuth設定
 
-To create a production version of your app:
+### ローカル開発
+
+- `VITE_ENV=local` を設定することで、OAuth リダイレクトが `localhost:5173` に設定されます
+- `client-metadata.json` には本番とローカルの両方のリダイレクトURIが含まれています
+
+### 本番環境
+
+- `https://echosky.app` でのデプロイ用に設定済み
+- OAuth クライアントメタデータは `https://echosky.app/client-metadata.json` で提供
+
+## ビルド
+
+本番用ビルドの作成：
 
 ```sh
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+ビルド結果のプレビュー：
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```sh
+npm run preview
+```
+
+## デプロイ
+
+CloudFlare Pages 用にアダプターが設定済みです。
+
+### 必要な設定
+
+1. **ドメイン**: `https://echosky.app`
+2. **静的ファイル**: `/client-metadata.json` がアクセス可能であること
+3. **ルーティング**: SPA ルーティングが正常に動作すること
+
+## 技術スタック
+
+- **フレームワーク**: SvelteKit
+- **プロトコル**: ATプロト (ATProto)
+- **認証**: OAuth 2.0 + PKCE + DPoP
+- **スタイリング**: Tailwind CSS
+- **デプロイ**: CloudFlare Pages

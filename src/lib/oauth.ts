@@ -1,20 +1,16 @@
 import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 import type { OAuthSession } from '@atproto/oauth-client-browser';
 
-// OAuth設定 - 本番環境用の設定
-const CLIENT_ID = 'https://echosky.app/client-metadata.json';
-const CLIENT_METADATA = {
-    client_id: CLIENT_ID,
-    client_name: 'EchoSky',
-    client_uri: 'https://echosky.app',
-    redirect_uris: ['https://echosky.app/oauth/callback'],
-    scope: 'atproto transition:generic',
-    grant_types: ['authorization_code', 'refresh_token'],
-    response_types: ['code'],
-    application_type: 'web',
-    token_endpoint_auth_method: 'none',
-    dpop_bound_access_tokens: true
-};
+// OAuth設定 - 環境に応じた動的設定
+const isLocal = typeof window !== 'undefined' 
+    ? window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    : import.meta.env.VITE_ENV === 'local';
+
+const BASE_URL = isLocal ? `http://${typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}` : 'https://echosky.app';
+const CLIENT_ID = 'https://echosky.app/client-metadata.json'; // クライアントIDは常に本番URL
+const REDIRECT_URI = `${BASE_URL}/oauth/callback`;
+
+// CLIENT_METADATA は static/client-metadata.json から自動読み込み
 
 // OAuthクライアントの初期化
 let oauthClient: BrowserOAuthClient | null = null;
@@ -26,9 +22,11 @@ export async function initOAuthClient() {
         // ブラウザ環境での初期化
         oauthClient = await BrowserOAuthClient.load({
             clientId: CLIENT_ID,
-            clientMetadata: CLIENT_METADATA,
             handleResolver: 'https://bsky.social',
         });
+        
+        console.log(`OAuth initialized for ${isLocal ? 'local' : 'production'} environment`);
+        console.log(`Redirect URI: ${REDIRECT_URI}`);
         
         return oauthClient;
     } catch (error) {
@@ -72,14 +70,14 @@ export async function handleOAuthCallback() {
 export async function getCurrentSession(): Promise<OAuthSession | null> {
     try {
         const client = await initOAuthClient();
-        const session = await client.restore();
+        const session = await client.restore('');
         return session;
     } catch (error) {
         console.error('Session restore error:', error);
         // セッション復元に失敗した場合、古いセッションデータをクリア
         try {
             const client = await initOAuthClient();
-            await client.revoke().catch(() => {}); // エラーを無視
+            await client.revoke('').catch(() => {}); // エラーを無視
         } catch (revokeError) {
             console.error('Failed to revoke session:', revokeError);
         }
@@ -91,8 +89,8 @@ export async function getCurrentSession(): Promise<OAuthSession | null> {
 export function getSessionInfo(session: OAuthSession) {
     return {
         did: session.sub,
-        handle: session.info?.handle || null,
-        pdsUrl: session.info?.pds || session.server,
+        handle: (session as any).info?.handle || null,
+        pdsUrl: (session as any).info?.pds || (session as any).server,
     };
 }
 
@@ -100,7 +98,7 @@ export function getSessionInfo(session: OAuthSession) {
 export async function logout() {
     try {
         const client = await initOAuthClient();
-        await client.revoke();
+        await client.revoke('');
     } catch (error) {
         console.error('Logout error:', error);
         // エラーが発生してもログアウト処理を続行

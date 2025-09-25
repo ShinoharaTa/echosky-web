@@ -5,7 +5,11 @@
   "logo_uri": "https://echosky.app/favicon.svg",
   "tos_uri": "https://echosky.app/terms",
   "policy_uri": "https://echosky.app/privacy",
-  "redirect_uris": ["https://echosky.app/oauth/callback"],
+  "redirect_uris": [
+    "https://echosky.app/oauth/callback",
+    "http://localhost:5173/oauth/callback",
+    "http://127.0.0.1:5173/oauth/callback"
+  ],
   "scope": "atproto transition:generic",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
