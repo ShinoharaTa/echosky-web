@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import type { OAuthSession } from '@atproto/oauth-client-browser';
 
 export type SessionState = {
 	did: string | null;
@@ -7,20 +8,22 @@ export type SessionState = {
 	refreshJwt: string | null;
 	pdsUrl: string | null;
 	loaded: boolean;
+	oauthSession?: OAuthSession | null;
 };
 
 const STORAGE_KEY = 'echosky.session.v1';
 
 function loadFromStorage(): SessionState {
 	if (typeof localStorage === 'undefined') {
-		return {
-			did: null,
-			handle: null,
-			accessJwt: null,
-			refreshJwt: null,
-			pdsUrl: null,
-			loaded: true
-		};
+	return {
+		did: null,
+		handle: null,
+		accessJwt: null,
+		refreshJwt: null,
+		pdsUrl: null,
+		loaded: true,
+		oauthSession: null
+	};
 	}
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
@@ -28,14 +31,15 @@ function loadFromStorage(): SessionState {
 		const parsed = JSON.parse(raw) as SessionState;
 		return { ...parsed, loaded: true };
 	} catch {
-		return {
-			did: null,
-			handle: null,
-			accessJwt: null,
-			refreshJwt: null,
-			pdsUrl: null,
-			loaded: true
-		};
+	return {
+		did: null,
+		handle: null,
+		accessJwt: null,
+		refreshJwt: null,
+		pdsUrl: null,
+		loaded: true,
+		oauthSession: null
+	};
 	}
 }
 

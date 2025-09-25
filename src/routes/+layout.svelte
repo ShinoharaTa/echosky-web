@@ -2,10 +2,29 @@
 	import favicon from '$lib/assets/favicon.svg';
     import { onMount } from 'svelte';
     import { resumeSession } from '$lib/atp';
-    import { session } from '$lib/session';
+    import { session, isLoggedIn, clearSession } from '$lib/session';
+    import { logoutAndRedirect } from '$lib/oauth';
     import '../app.css';
 
 	let { children } = $props();
+
+    async function handleLogout() {
+        // 確認ダイアログを表示
+        if (!confirm('ログアウトしますか？')) {
+            return;
+        }
+
+        try {
+            // ローカルセッションをクリア
+            clearSession();
+            // OAuth セッションを破棄してリダイレクト
+            await logoutAndRedirect();
+        } catch (error) {
+            console.error('Logout error:', error);
+            // エラーが発生してもログインページにリダイレクト
+            window.location.href = '/';
+        }
+    }
 
     onMount(() => {
         resumeSession();
@@ -27,9 +46,30 @@
                 EchoSky
             </a>
             <nav class="ml-auto flex items-center gap-6">
-                <a href="/home" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors dark:text-gray-300 dark:hover:text-blue-400">
-                    ホーム
-                </a>
+                {#if $session.loaded && isLoggedIn($session)}
+                    <a href="/home" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors dark:text-gray-300 dark:hover:text-blue-400">
+                        ホーム
+                    </a>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">
+                            {$session.handle || $session.did}
+                        </span>
+                        <button 
+                            onclick={handleLogout}
+                            class="btn-secondary text-sm px-3 py-1.5"
+                            aria-label="ログアウト"
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            ログアウト
+                        </button>
+                    </div>
+                {:else}
+                    <a href="/" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors dark:text-gray-300 dark:hover:text-blue-400">
+                        ログイン
+                    </a>
+                {/if}
             </nav>
         </div>
     </header>

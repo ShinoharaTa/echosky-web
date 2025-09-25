@@ -17,6 +17,8 @@
 	},
 	"dependencies": {
 		"@atproto/api": "^0.13.18",
+		"@atproto/oauth-client-browser": "^0.3.32",
+		"@atproto/oauth-types": "^0.4.1",
 		"@echosky/board-lexicons": "^0.1.1",
 		"dayjs": "^1.11.13"
 	},

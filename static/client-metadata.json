@@ -1,0 +1,15 @@
+{
+  "client_id": "https://echosky.app",
+  "client_name": "EchoSky",
+  "client_uri": "https://echosky.app",
+  "logo_uri": "https://echosky.app/favicon.svg",
+  "tos_uri": "https://echosky.app/terms",
+  "policy_uri": "https://echosky.app/privacy",
+  "redirect_uris": ["https://echosky.app/oauth/callback"],
+  "scope": "atproto transition:generic",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "token_endpoint_auth_method": "none",
+  "dpop_bound_access_tokens": true
+}

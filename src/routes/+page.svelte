@@ -1,12 +1,9 @@
 <script lang="ts">
     import { session, isLoggedIn } from '$lib/session';
-    import { get } from 'svelte/store';
-    import { loginWithPassword } from '$lib/atp';
+    import { startOAuthLogin, getCurrentSession, getSessionInfo } from '$lib/oauth';
     import { onMount } from 'svelte';
 
-    let service = 'https://bsky.social';
-    let identifier = '';
-    let password = '';
+    let handle = '';
     let error = '';
     let busy = false;
 
@@ -15,14 +12,34 @@
         error = '';
         busy = true;
         try {
-            await loginWithPassword({ service, identifier, password });
+            await startOAuthLogin(handle);
         } catch (err) {
             error = 'ログインに失敗しました';
             console.error(err);
-        } finally {
             busy = false;
         }
     }
+
+    onMount(async () => {
+        // 既存のOAuthセッションを確認
+        try {
+            const oauthSession = await getCurrentSession();
+            if (oauthSession) {
+                const sessionInfo = getSessionInfo(oauthSession);
+                session.set({
+                    did: sessionInfo.did,
+                    handle: sessionInfo.handle,
+                    accessJwt: null,
+                    refreshJwt: null,
+                    pdsUrl: sessionInfo.pdsUrl,
+                    loaded: true,
+                    oauthSession
+                });
+            }
+        } catch (err) {
+            console.error('Session restore error:', err);
+        }
+    });
 </script>
 
 {#if $session.loaded && !isLoggedIn($session)}
@@ -40,38 +57,19 @@
         
         <form on:submit={submit} aria-label="login" class="space-y-6">
             <div class="space-y-1">
-                <label for="service" class="block text-sm font-medium text-gray-700 dark:text-gray-300">PDS サーバー</label>
+                <label for="handle" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ハンドル</label>
                 <input 
-                    id="service" 
-                    name="service" 
-                    bind:value={service} 
-                    placeholder="https://bsky.social" 
-                    class="input-field" 
-                />
-            </div>
-            
-            <div class="space-y-1">
-                <label for="identifier" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ハンドル / メールアドレス</label>
-                <input 
-                    id="identifier" 
-                    name="identifier" 
-                    bind:value={identifier} 
+                    id="handle" 
+                    name="handle" 
+                    bind:value={handle} 
                     autocomplete="username" 
-                    placeholder="@username.bsky.social"
+                    placeholder="username.bsky.social"
                     class="input-field" 
+                    required
                 />
-            </div>
-            
-            <div class="space-y-1">
-                <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">パスワード</label>
-                <input 
-                    id="password" 
-                    type="password" 
-                    name="password" 
-                    bind:value={password} 
-                    autocomplete="current-password" 
-                    class="input-field" 
-                />
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    OAuthを使用した安全なログインです
+                </p>
             </div>
             
             {#if error}
@@ -86,9 +84,9 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    ログイン中...
+                    認証ページへ移動中...
                 {:else}
-                    ログイン
+                    OAuthでログイン
                 {/if}
             </button>
         </form>
