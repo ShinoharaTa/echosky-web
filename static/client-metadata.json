@@ -1,5 +1,5 @@
 {
-  "client_id": "https://echosky.app",
+  "client_id": "https://echosky.app/client-metadata.json",
   "client_name": "EchoSky",
   "client_uri": "https://echosky.app",
   "logo_uri": "https://echosky.app/favicon.svg",

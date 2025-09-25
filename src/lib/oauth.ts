@@ -2,7 +2,7 @@ import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 import type { OAuthSession } from '@atproto/oauth-client-browser';
 
 // OAuth設定 - 本番環境用の設定
-const CLIENT_ID = 'https://echosky.app';
+const CLIENT_ID = 'https://echosky.app/client-metadata.json';
 const CLIENT_METADATA = {
     client_id: CLIENT_ID,
     client_name: 'EchoSky',
