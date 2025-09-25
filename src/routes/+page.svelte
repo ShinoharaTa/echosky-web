@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { session, isLoggedIn } from '$lib/session';
-    import { startOAuthLogin, getCurrentSession, getSessionInfo } from '$lib/oauth';
+    import { session, isLoggedIn, clearSession } from '$lib/session';
+    import { startOAuthLogin, getCurrentSession, getSessionInfo, clearCorruptedSession } from '$lib/oauth';
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
 
     let handle = '';
     let error = '';
@@ -26,18 +27,31 @@
             const oauthSession = await getCurrentSession();
             if (oauthSession) {
                 const sessionInfo = getSessionInfo(oauthSession);
-                session.set({
-                    did: sessionInfo.did,
-                    handle: sessionInfo.handle,
-                    accessJwt: null,
-                    refreshJwt: null,
-                    pdsUrl: sessionInfo.pdsUrl,
-                    loaded: true,
-                    oauthSession
-                });
+                // DIDの形式を検証
+                if (sessionInfo.did && typeof sessionInfo.did === 'string' && sessionInfo.did.startsWith('did:')) {
+                    session.set({
+                        did: sessionInfo.did,
+                        handle: sessionInfo.handle,
+                        accessJwt: null,
+                        refreshJwt: null,
+                        pdsUrl: sessionInfo.pdsUrl,
+                        loaded: true,
+                        oauthSession
+                    });
+                    // 既にログイン済みの場合はホームにリダイレクト
+                    goto('/home');
+                } else {
+                    console.warn('Invalid DID format, clearing session');
+                    // 無効なDIDの場合はセッションをクリア
+                    clearSession();
+                }
             }
         } catch (err) {
             console.error('Session restore error:', err);
+            // エラーが発生した場合はセッションをクリア
+            clearSession();
+            // 破損したOAuthデータもクリア
+            await clearCorruptedSession();
         }
     });
 </script>

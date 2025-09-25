@@ -27,6 +27,7 @@ export async function initOAuthClient() {
         oauthClient = await BrowserOAuthClient.load({
             clientId: CLIENT_ID,
             clientMetadata: CLIENT_METADATA,
+            handleResolver: 'https://bsky.social',
         });
         
         return oauthClient;
@@ -75,6 +76,13 @@ export async function getCurrentSession(): Promise<OAuthSession | null> {
         return session;
     } catch (error) {
         console.error('Session restore error:', error);
+        // セッション復元に失敗した場合、古いセッションデータをクリア
+        try {
+            const client = await initOAuthClient();
+            await client.revoke().catch(() => {}); // エラーを無視
+        } catch (revokeError) {
+            console.error('Failed to revoke session:', revokeError);
+        }
         return null;
     }
 }
@@ -105,5 +113,38 @@ export async function logoutAndRedirect() {
     // ホームページにリダイレクト
     if (typeof window !== 'undefined') {
         window.location.href = '/';
+    }
+}
+
+// 破損したセッションデータをクリア
+export async function clearCorruptedSession() {
+    if (typeof window === 'undefined') return;
+    
+    try {
+        // IndexedDBのOAuthデータをクリア
+        const databases = await indexedDB.databases();
+        for (const db of databases) {
+            if (db.name && (db.name.includes('oauth') || db.name.includes('atproto'))) {
+                const deleteRequest = indexedDB.deleteDatabase(db.name);
+                await new Promise((resolve, reject) => {
+                    deleteRequest.onsuccess = () => resolve(undefined);
+                    deleteRequest.onerror = () => reject(deleteRequest.error);
+                });
+            }
+        }
+        
+        // LocalStorageのOAuthデータもクリア
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.includes('oauth') || key.includes('atproto'))) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        console.log('Cleared corrupted OAuth session data');
+    } catch (error) {
+        console.error('Failed to clear corrupted session data:', error);
     }
 }
