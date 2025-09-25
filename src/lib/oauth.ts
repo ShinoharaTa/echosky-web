@@ -6,7 +6,7 @@ const isLocal = typeof window !== 'undefined'
     ? window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     : import.meta.env.VITE_ENV === 'local';
 
-const BASE_URL = isLocal ? `http://${typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}` : 'https://echosky.app';
+const BASE_URL = isLocal ? `http://${typeof window !== 'undefined' ? window.location.host.replace('localhost', '127.0.0.1') : '127.0.0.1:5173'}` : 'https://echosky.app';
 const CLIENT_ID = 'https://echosky.app/client-metadata.json'; // クライアントIDは常に本番URL
 const REDIRECT_URI = `${BASE_URL}/oauth/callback`;
 
