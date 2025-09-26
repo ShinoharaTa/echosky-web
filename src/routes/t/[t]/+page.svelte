@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
+    import { goto } from '$app/navigation';
+    import { session, isLoggedIn } from '$lib/session';
     import { decodeUriFromRoute } from '$lib/uri';
     import { listPosts, createPost, toggleReaction } from '$lib/api';
     // dayjs を使わず Intl で整形
@@ -95,7 +97,14 @@
         saveDraft();
     });
 
-    onMount(load);
+    onMount(() => {
+        // ログインチェック
+        if (!isLoggedIn($session)) {
+            goto('/login');
+            return;
+        }
+        load();
+    });
 </script>
 
 <div class="space-y-6">

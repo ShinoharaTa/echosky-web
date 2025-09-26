@@ -17,7 +17,7 @@
 	},
 	"dependencies": {
 		"@atproto/api": "^0.13.18",
-		"@echosky/board-lexicons": "^0.1.1",
+		"@echosky/board-lexicons": "^0.1.2",
 		"dayjs": "^1.11.13"
 	},
 	"devDependencies": {

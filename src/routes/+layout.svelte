@@ -40,7 +40,7 @@
             </a>
             <nav class="ml-auto flex items-center gap-6">
                 {#if $session.loaded && isLoggedIn($session)}
-                    <a href="/home" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors dark:text-gray-300 dark:hover:text-blue-400">
+                    <a href="/" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors dark:text-gray-300 dark:hover:text-blue-400">
                         ホーム
                     </a>
                     <div class="flex items-center gap-3">
@@ -59,7 +59,7 @@
                         </button>
                     </div>
                 {:else}
-                    <a href="/" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors dark:text-gray-300 dark:hover:text-blue-400">
+                    <a href="/login" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors dark:text-gray-300 dark:hover:text-blue-400">
                         ログイン
                     </a>
                 {/if}

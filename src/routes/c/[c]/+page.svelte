@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
+    import { goto } from '$app/navigation';
+    import { session, isLoggedIn } from '$lib/session';
     import { encodeUriForRoute } from '$lib/uri';
     import { listThreads, createThread } from '$lib/api';
 
@@ -35,13 +37,20 @@
         }
     }
 
-    onMount(load);
+    onMount(() => {
+        // ログインチェック
+        if (!isLoggedIn($session)) {
+            goto('/login');
+            return;
+        }
+        load();
+    });
 </script>
 
 <div class="space-y-8">
     <!-- ヘッダー -->
     <div class="flex items-center gap-4">
-        <a href="/home" class="btn-secondary">
+        <a href="/" class="btn-secondary">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
             </svg>
@@ -72,7 +81,7 @@
         {:else}
             <div class="space-y-3">
                 {#each threads as t}
-                    <a href={'/home/t/' + encodeUriForRoute(t.uri)} class="card p-4 hover:scale-[1.02] transition-transform duration-200">
+                    <a href={'/t/' + encodeUriForRoute(t.uri)} class="card p-4 hover:scale-[1.02] transition-transform duration-200">
                         <div class="flex items-center gap-3">
                             <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

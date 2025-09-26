@@ -38,7 +38,7 @@ export type BoardId = string;
 
 export type ThreadRecord = {
     title: string;
-    board?: BoardId;
+    board?: BoardId;  // optional (レキシコン定義に合わせて)
     createdAt: string;
 };
 
@@ -46,69 +46,151 @@ export type PostRecord = {
 	thread: string; // at-uri of thread
 	text: string;
 	createdAt: string;
-	facets?: unknown[];
-	refPost?: { uri: string; cid: string } | null;
+	facets?: Array<{
+		index: { byteStart: number; byteEnd: number };
+		features: Array<{
+			$type: string;
+			[key: string]: any;
+		}>;
+	}>;  // app.bsky.richtext.facet 対応
+	refPost?: { uri: string; cid: string } | null;  // com.atproto.repo.strongRef
 };
 
 export type ReactionKind = 'like' | 'laugh' | 'sad' | 'angry' | 'star';
 
 export type ReactionRecord = {
-    subject: { uri: string; cid: string };
-    reaction: ReactionKind;
+    subject: { uri: string; cid: string };  // com.atproto.repo.strongRef
+    reaction: ReactionKind;  // enum: like, laugh, sad, angry, star
     createdAt: string;
+};
+
+export type BoardInfoRecord = {
+    boardId: string;
+    name: string;
+    description?: string;
+    thumbnail?: Blob;
+    createdAt: string;
+    updatedAt?: string;
 };
 
 const COL = {
     thread: 'app.echosky.board.thread',
     post: 'app.echosky.board.post',
-    reaction: 'app.echosky.board.reaction'
+    reaction: 'app.echosky.board.reaction',
+    boardInfo: 'app.echosky.board.info'
 } as const;
 
-// コミュニティ相当は board 文字列の集合で表現（MVP簡易仕様）
-// 全ユーザーのボードを取得するため、既知のアクティブユーザーから収集
+// ランダムなボード識別子を生成
+function generateBoardId(): string {
+    // 8文字のランダムな英数字を生成
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// バリデーション関数
+function validateBoardId(boardId: string): boolean {
+    // レキシコン仕様: 英数字・ハイフン・アンダースコアのみ、最大50文字
+    const pattern = /^[a-zA-Z0-9_-]+$/;
+    return pattern.test(boardId) && boardId.length <= 50;
+}
+
+function validateThreadTitle(title: string): boolean {
+    // レキシコン仕様: 最大200文字
+    return title.length <= 200;
+}
+
+function validatePostText(text: string): boolean {
+    // レキシコン仕様: 最大5000文字
+    return text.length <= 5000;
+}
+
+function validateBoardName(name: string): boolean {
+    // レキシコン仕様: 最大100文字
+    return name.length <= 100;
+}
+
+// ボード情報レコードとスレッドレコードの両方からボード一覧を取得
 export async function listBoards(includeFollows: boolean = true): Promise<BoardId[]> {
     const s = get(session);
     const a = getAgent();
     const boards = new Set<string>();
     
     try {
-        // 自分のボードを取得
-        const myRes = await a.com.atproto.repo.listRecords({ 
-            repo: s.did!, 
-            collection: COL.thread, 
-            limit: 100 
-        });
-        for (const r of myRes.data.records) {
-            const v = r.value as ThreadRecord;
-            if (v.board) boards.add(v.board);
+        // 1. 自分のボード情報レコードを取得（新しいボード）
+        try {
+            const boardInfoRes = await a.com.atproto.repo.listRecords({ 
+                repo: s.did!, 
+                collection: COL.boardInfo, 
+                limit: 100 
+            });
+            for (const r of boardInfoRes.data.records) {
+                const v = r.value as BoardInfoRecord;
+                boards.add(v.boardId);
+            }
+        } catch (error) {
+            console.debug('Failed to fetch board info records:', error);
         }
 
-        // フォロー中のユーザーのボードも取得（簡易実装）
-        if (includeFollows) {
+        // 2. 自分のスレッドレコードからボードを取得（既存のボード）
+        try {
+            const threadRes = await a.com.atproto.repo.listRecords({ 
+                repo: s.did!, 
+                collection: COL.thread, 
+                limit: 100 
+            });
+            for (const r of threadRes.data.records) {
+                const v = r.value as ThreadRecord;
+                if (v.board) {
+                    boards.add(v.board);
+                }
+            }
+        } catch (error) {
+            console.debug('Failed to fetch thread records:', error);
+        }
+
+        // フォロー中のユーザーのボードも取得（現在は無効化）
+        // 注意: 現在はパフォーマンス上の理由で無効化されています
+        if (includeFollows && false) {
             try {
                 const follows = await a.app.bsky.graph.getFollows({ 
                     actor: s.did!, 
-                    limit: 25  // limit を減らして負荷軽減
+                    limit: 25
                 });
             
-            // 並行処理数を制限
             const batchSize = 5;
             for (let i = 0; i < follows.data.follows.length; i += batchSize) {
                 const batch = follows.data.follows.slice(i, i + batchSize);
                 await Promise.allSettled(
                     batch.map(async (follow) => {
                         try {
-                            const userRes = await a.com.atproto.repo.listRecords({ 
+                            // フォローユーザーのボード情報レコード
+                            const userBoardInfoRes = await a.com.atproto.repo.listRecords({ 
+                                repo: follow.did, 
+                                collection: COL.boardInfo, 
+                                limit: 10
+                            });
+                            for (const r of userBoardInfoRes.data.records) {
+                                const v = r.value as BoardInfoRecord;
+                                boards.add(v.boardId);
+                            }
+
+                            // フォローユーザーのスレッドレコード
+                            const userThreadRes = await a.com.atproto.repo.listRecords({ 
                                 repo: follow.did, 
                                 collection: COL.thread, 
-                                limit: 10  // limit を減らして負荷軽減
+                                limit: 10
                             });
-                            for (const r of userRes.data.records) {
+                            for (const r of userThreadRes.data.records) {
                                 const v = r.value as ThreadRecord;
-                                if (v.board) boards.add(v.board);
+                                if (v.board) {
+                                    boards.add(v.board);
+                                }
                             }
                         } catch (error) {
-                            // ユーザーのレコード取得エラーは無視
                             console.debug('Failed to fetch records for user:', follow.did, error);
                         }
                     })
@@ -121,7 +203,6 @@ export async function listBoards(includeFollows: boolean = true): Promise<BoardI
 
     } catch (error) {
         console.error('Failed to fetch boards:', error);
-        // エラー時は空のリストを返す
     }
     
     return Array.from(boards).sort();
@@ -195,11 +276,120 @@ export async function listThreads(board?: string, includeFollows: boolean = true
 }
 
 export async function createThread(input: { board?: BoardId; title: string }) {
+	// バリデーション
+	if (!validateThreadTitle(input.title)) {
+		throw new Error('スレッドタイトルは200文字以内である必要があります');
+	}
+	if (input.board && !validateBoardId(input.board)) {
+		throw new Error('ボード名は英数字・ハイフン・アンダースコアのみ使用可能で、50文字以内である必要があります');
+	}
+
 	const s = get(session);
 	const a = getAgent();
     const record: ThreadRecord = { board: input.board, title: input.title, createdAt: new Date().toISOString() };
     const res = await a.com.atproto.repo.createRecord({ repo: s.did!, collection: COL.thread, record });
 	return res.data;
+}
+
+export async function createBoard(name: string, description?: string) {
+	// バリデーション
+	if (!validateBoardName(name)) {
+		throw new Error('ボード名は100文字以内である必要があります');
+	}
+	if (description && description.length > 1000) {
+		throw new Error('説明文は1000文字以内である必要があります');
+	}
+
+	const s = get(session);
+	const a = getAgent();
+	
+	// 重複しない識別子を生成（簡易版）
+	let boardId: string;
+	let attempts = 0;
+	const maxAttempts = 5; // 試行回数を減らす
+	
+	// 既存ボードの取得は1回のみ（boardInfoとthreadの両方をチェック）
+	let existingBoards: string[] = [];
+	try {
+		// ボード情報レコードから取得
+		const boardInfoRes = await a.com.atproto.repo.listRecords({ 
+			repo: s.did!, 
+			collection: COL.boardInfo, 
+			limit: 100 
+		});
+		existingBoards.push(...boardInfoRes.data.records.map(r => (r.value as BoardInfoRecord).boardId));
+
+		// スレッドレコードからも取得
+		const threadRes = await a.com.atproto.repo.listRecords({ 
+			repo: s.did!, 
+			collection: COL.thread, 
+			limit: 100 
+		});
+		existingBoards.push(...threadRes.data.records
+			.map(r => (r.value as ThreadRecord).board)
+			.filter(board => board) // undefinedを除外
+		);
+
+		// 重複を除去
+		existingBoards = Array.from(new Set(existingBoards));
+	} catch (error) {
+		console.warn('Failed to fetch existing boards for duplicate check:', error);
+	}
+	
+	do {
+		boardId = generateBoardId();
+		attempts++;
+		
+		// 既存のボードIDと重複しないかチェック
+		if (!existingBoards.includes(boardId)) {
+			break; // 重複なし、使用可能
+		}
+		
+		if (attempts >= maxAttempts) {
+			// 最大試行回数に達した場合、タイムスタンプを追加して確実に一意にする
+			boardId = generateBoardId() + Date.now().toString(36).slice(-4);
+			break;
+		}
+	} while (true);
+
+	// ボード情報レコードを作成（スレッドは作成しない）
+    const record: BoardInfoRecord = { 
+		boardId: boardId,
+		name: name,
+		description: description,
+		createdAt: new Date().toISOString() 
+	};
+    const res = await a.com.atproto.repo.createRecord({ 
+		repo: s.did!, 
+		collection: COL.boardInfo, 
+		record 
+	});
+	return { boardId: boardId, name: name, boardInfo: res.data };
+}
+
+export async function getBoardInfo(boardId: string, repo?: string): Promise<BoardInfoRecord | null> {
+	// 特定のボード情報を取得
+	const s = get(session);
+	const a = getAgent();
+	
+	try {
+		const res = await a.com.atproto.repo.listRecords({ 
+			repo: repo ?? s.did!, 
+			collection: COL.boardInfo, 
+			limit: 100 
+		});
+		
+		for (const r of res.data.records) {
+			const v = r.value as BoardInfoRecord;
+			if (v.boardId === boardId) {
+				return v;
+			}
+		}
+		return null;
+	} catch (error) {
+		console.error('Failed to fetch board info:', error);
+		return null;
+	}
 }
 
 export async function listPosts(repo?: string) {
@@ -212,6 +402,11 @@ export async function listPosts(repo?: string) {
 }
 
 export async function createPost(input: { threadUri: string; text: string; refPost?: { uri: string; cid: string } | null }) {
+	// バリデーション
+	if (!validatePostText(input.text)) {
+		throw new Error('投稿は5000文字以内である必要があります');
+	}
+
 	const s = get(session);
 	const a = getAgent();
 	const record: PostRecord = {
