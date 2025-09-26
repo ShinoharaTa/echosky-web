@@ -16,8 +16,8 @@
         loading = true;
         try {
             board = paramBoard();
-            const all = await listThreads();
-            threads = all.filter((t: { uri: string; cid: string; value: any }) => t.value.board === board);
+            // 特定のボードのスレッドのみを取得
+            threads = await listThreads(board, false); // フォロー取得を無効にして負荷軽減
         } finally {
             loading = false;
         }

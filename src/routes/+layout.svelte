@@ -3,27 +3,20 @@
     import { onMount } from 'svelte';
     import { resumeSession } from '$lib/atp';
     import { session, isLoggedIn, clearSession } from '$lib/session';
-    import { logoutAndRedirect } from '$lib/oauth';
     import '../app.css';
 
 	let { children } = $props();
 
-    async function handleLogout() {
+    function handleLogout() {
         // 確認ダイアログを表示
         if (!confirm('ログアウトしますか？')) {
             return;
         }
 
-        try {
-            // ローカルセッションをクリア
-            clearSession();
-            // OAuth セッションを破棄してリダイレクト
-            await logoutAndRedirect();
-        } catch (error) {
-            console.error('Logout error:', error);
-            // エラーが発生してもログインページにリダイレクト
-            window.location.href = '/';
-        }
+        // セッションをクリア
+        clearSession();
+        // ログインページにリダイレクト
+        window.location.href = '/';
     }
 
     onMount(() => {
@@ -43,7 +36,7 @@
                 <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
-                EchoSky
+                Echosky
             </a>
             <nav class="ml-auto flex items-center gap-6">
                 {#if $session.loaded && isLoggedIn($session)}

@@ -2,6 +2,37 @@ import { getAgent } from './atp';
 import { get } from 'svelte/store';
 import { session } from './session';
 
+// リトライ機能付きのAPI呼び出し
+async function withRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error: any) {
+            const isRateLimit = error?.status === 429 || error?.message?.includes('Too Many Requests');
+            const isServerError = error?.status >= 500;
+            
+            if ((isRateLimit || isServerError) && attempt < maxRetries) {
+                // 指数バックオフでリトライ
+                const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+                console.log(`API call failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms...`, error?.message);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error('Max retries exceeded');
+}
+
+// レート制限を考慮した遅延
+async function rateLimitDelay(ms: number = 100): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ボード（コミュニティ）は thread.record.board の文字列で表現する設計に合わせる
 export type BoardId = string;
 
@@ -34,28 +65,131 @@ const COL = {
 } as const;
 
 // コミュニティ相当は board 文字列の集合で表現（MVP簡易仕様）
-export async function listBoards(repo?: string): Promise<BoardId[]> {
+// 全ユーザーのボードを取得するため、既知のアクティブユーザーから収集
+export async function listBoards(includeFollows: boolean = true): Promise<BoardId[]> {
     const s = get(session);
     const a = getAgent();
-    const res = await a.com.atproto.repo.listRecords({ repo: repo ?? s.did!, collection: COL.thread, limit: 100 });
     const boards = new Set<string>();
-    for (const r of res.data.records) {
-        const v = r.value as ThreadRecord;
-        if (v.board) boards.add(v.board);
+    
+    try {
+        // 自分のボードを取得
+        const myRes = await a.com.atproto.repo.listRecords({ 
+            repo: s.did!, 
+            collection: COL.thread, 
+            limit: 100 
+        });
+        for (const r of myRes.data.records) {
+            const v = r.value as ThreadRecord;
+            if (v.board) boards.add(v.board);
+        }
+
+        // フォロー中のユーザーのボードも取得（簡易実装）
+        if (includeFollows) {
+            try {
+                const follows = await a.app.bsky.graph.getFollows({ 
+                    actor: s.did!, 
+                    limit: 25  // limit を減らして負荷軽減
+                });
+            
+            // 並行処理数を制限
+            const batchSize = 5;
+            for (let i = 0; i < follows.data.follows.length; i += batchSize) {
+                const batch = follows.data.follows.slice(i, i + batchSize);
+                await Promise.allSettled(
+                    batch.map(async (follow) => {
+                        try {
+                            const userRes = await a.com.atproto.repo.listRecords({ 
+                                repo: follow.did, 
+                                collection: COL.thread, 
+                                limit: 10  // limit を減らして負荷軽減
+                            });
+                            for (const r of userRes.data.records) {
+                                const v = r.value as ThreadRecord;
+                                if (v.board) boards.add(v.board);
+                            }
+                        } catch (error) {
+                            // ユーザーのレコード取得エラーは無視
+                            console.debug('Failed to fetch records for user:', follow.did, error);
+                        }
+                    })
+                );
+            }
+            } catch (error) {
+                console.debug('Failed to fetch follows:', error);
+            }
+        }
+
+    } catch (error) {
+        console.error('Failed to fetch boards:', error);
+        // エラー時は空のリストを返す
     }
+    
     return Array.from(boards).sort();
 }
 
-export async function listThreads(repo?: string) {
+export async function listThreads(board?: string, includeFollows: boolean = true) {
 	const s = get(session);
 	const a = getAgent();
-	const res = await a.com.atproto.repo.listRecords({
-		repo: repo ?? s.did!,
-        collection: COL.thread,
-		limit: 100
-	});
-	return res.data.records
-        .map((r) => ({ uri: r.uri, cid: r.cid, value: r.value as ThreadRecord }))
+	const allThreads: Array<{ uri: string; cid: string; value: ThreadRecord }> = [];
+	
+	try {
+		// 自分のスレッドを取得
+		const myRes = await a.com.atproto.repo.listRecords({
+			repo: s.did!,
+			collection: COL.thread,
+			limit: 100
+		});
+		
+		for (const r of myRes.data.records) {
+			const threadValue = r.value as ThreadRecord;
+			if (!board || threadValue.board === board) {
+				allThreads.push({ uri: r.uri, cid: r.cid, value: threadValue });
+			}
+		}
+
+		// フォロー中のユーザーのスレッドも取得
+		if (includeFollows) {
+			try {
+				const follows = await a.app.bsky.graph.getFollows({ 
+					actor: s.did!, 
+					limit: 25  // limit を減らして負荷軽減
+				});
+			
+			// 並行処理数を制限
+			const batchSize = 5;
+			for (let i = 0; i < follows.data.follows.length; i += batchSize) {
+				const batch = follows.data.follows.slice(i, i + batchSize);
+				await Promise.allSettled(
+					batch.map(async (follow) => {
+						try {
+							const userRes = await a.com.atproto.repo.listRecords({
+								repo: follow.did,
+								collection: COL.thread,
+								limit: 10  // limit を減らして負荷軽減
+							});
+							
+							for (const r of userRes.data.records) {
+								const threadValue = r.value as ThreadRecord;
+								if (!board || threadValue.board === board) {
+									allThreads.push({ uri: r.uri, cid: r.cid, value: threadValue });
+								}
+							}
+						} catch (error) {
+							console.debug('Failed to fetch threads for user:', follow.did, error);
+						}
+					})
+				);
+			}
+			} catch (error) {
+				console.debug('Failed to fetch follows:', error);
+			}
+		}
+
+	} catch (error) {
+		console.error('Failed to fetch threads:', error);
+	}
+	
+	return allThreads
 		.sort((a, b) => (a.value.createdAt === b.value.createdAt ? a.uri.localeCompare(b.uri) : a.value.createdAt.localeCompare(b.value.createdAt)))
 		.reverse();
 }

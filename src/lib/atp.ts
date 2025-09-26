@@ -37,16 +37,7 @@ export async function loginWithPassword(params: {
 export async function resumeSession(): Promise<boolean> {
 	const s = get(session);
 	
-	// OAuthセッションが存在する場合はそちらを優先
-	if (s.oauthSession) {
-		session.set({
-			...s,
-			loaded: true
-		});
-		return true;
-	}
-	
-	// 従来のJWTベースセッション
+	// JWTベースセッション
 	if (!s.refreshJwt || !s.pdsUrl) return false;
 	const a = getAgent({ service: s.pdsUrl });
 	try {

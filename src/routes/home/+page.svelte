@@ -4,6 +4,7 @@
     import { listBoards, createThread, listThreads } from '$lib/api';
 
     let boards: string[] = [];
+    let boardThreadCounts: Record<string, number> = {};
     let title = '';
     let board = '';
     let loading = false;
@@ -12,7 +13,19 @@
     async function load() {
         loading = true;
         try {
-            boards = await listBoards();
+            boards = await listBoards(false); // フォロー取得を無効にして負荷軽減
+            
+            // 各ボードのスレッド数を取得
+            boardThreadCounts = {};
+            for (const boardName of boards) {
+                try {
+                    const threads = await listThreads(boardName, false); // フォロー取得を無効にして負荷軽減
+                    boardThreadCounts[boardName] = threads.length;
+                } catch (error) {
+                    console.debug('Failed to get thread count for board:', boardName);
+                    boardThreadCounts[boardName] = 0;
+                }
+            }
         } finally {
             loading = false;
         }
@@ -36,7 +49,7 @@
 <div class="space-y-8">
     <!-- ヘッダー -->
     <div class="text-center">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">EchoSky ホーム</h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Echosky ホーム</h1>
         <p class="text-gray-600 dark:text-gray-400 mt-2">ATProto掲示板システム</p>
         <div class="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm dark:bg-blue-900/30 dark:text-blue-300">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -76,7 +89,9 @@
                             </div>
                             <div class="flex-1 min-w-0">
                                 <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{b}</h3>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">ボード</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    {boardThreadCounts[b] || 0} スレッド
+                                </p>
                             </div>
                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>

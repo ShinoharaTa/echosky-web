@@ -3,8 +3,8 @@
 </script>
 
 <svelte:head>
-    <title>プライバシーポリシー - EchoSky</title>
-    <meta name="description" content="EchoSkyのプライバシーポリシー" />
+    <title>プライバシーポリシー - Echosky</title>
+    <meta name="description" content="Echoskyのプライバシーポリシー" />
 </svelte:head>
 
 <div class="container-page py-12">
@@ -15,7 +15,7 @@
             <section class="mb-8">
                 <h2 class="text-2xl font-semibold mb-4">1. 基本方針</h2>
                 <p>
-                    EchoSky（以下「本サービス」）は、利用者のプライバシーを尊重し、
+                    Echosky（以下「本サービス」）は、利用者のプライバシーを尊重し、
                     個人情報の保護に努めます。本ポリシーは、本サービスにおける
                     個人情報の取扱いについて定めるものです。
                 </p>

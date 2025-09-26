@@ -3,8 +3,8 @@
 </script>
 
 <svelte:head>
-    <title>利用規約 - EchoSky</title>
-    <meta name="description" content="EchoSkyの利用規約" />
+    <title>利用規約 - Echosky</title>
+    <meta name="description" content="Echoskyの利用規約" />
 </svelte:head>
 
 <div class="container-page py-12">
@@ -15,7 +15,7 @@
             <section class="mb-8">
                 <h2 class="text-2xl font-semibold mb-4">第1条（適用）</h2>
                 <p>
-                    本利用規約（以下「本規約」）は、EchoSky（以下「本サービス」）の利用に関する条件を定めるものです。
+                    本利用規約（以下「本規約」）は、Echosky（以下「本サービス」）の利用に関する条件を定めるものです。
                     本サービスをご利用いただく際には、本規約に同意いただいたものとみなします。
                 </p>
             </section>
